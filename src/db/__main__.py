@@ -1,6 +1,7 @@
 """Main entry point."""
 
-from .tui import run
+from src.db.tui import TUI
 
 if __name__ == "__main__":
-    run()
+    app = TUI()
+    app.run()
