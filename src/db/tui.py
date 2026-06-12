@@ -1,6 +1,15 @@
+"""Text user interface for database."""
+
 from src.db.backend.file import FileDatabase
 from src.db.backend.memory import MemoryDatabase
-from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError
+from src.db.backend.errors import (
+    TableNotFoundError, 
+    TableAlreadyExistsError,
+    InvalidAgeError,
+    DuplicateIDError,
+    MissingColumnError,
+    UnknownColumnError
+)
 
 
 class TUI:
@@ -50,6 +59,7 @@ class TUI:
             except TableNotFoundError:
                 print("❌ Таблица не найдена. Создайте её.")
         elif choice == "0":
+            print("До свидания!")
             exit()
 
     def _record_menu(self):
@@ -71,41 +81,147 @@ class TUI:
         elif choice == "4":
             self.current_table = None
         elif choice == "0":
+            print("До свидания!")
             exit()
+        else:
+            print("❌ Неверная команда")
 
     def _add_record(self):
+        """Добавление новой записи с проверками."""
+        print("\n=== Добавление студента ===")
+        
         try:
+            # Ввод ID
+            student_id = input("id: ").strip()
+            if not student_id:
+                print("❌ Ошибка: id не может быть пустым")
+                return
+            try:
+                student_id = int(student_id)
+            except ValueError:
+                print("❌ Ошибка: id должен быть целым числом")
+                return
+            
+            # Ввод имени
+            first_name = input("Имя: ").strip()
+            if not first_name:
+                print("❌ Ошибка: имя не может быть пустым")
+                return
+            
+            # Ввод фамилии
+            second_name = input("Фамилия: ").strip()
+            if not second_name:
+                print("❌ Ошибка: фамилия не может быть пустой")
+                return
+            
+            # Ввод возраста
+            age = input("Возраст: ").strip()
+            if not age:
+                print("❌ Ошибка: возраст не может быть пустым")
+                return
+            try:
+                age = int(age)
+            except ValueError:
+                print("❌ Ошибка: возраст должен быть целым числом")
+                return
+            
+            # Ввод пола
+            sex = input("Пол (м/ж): ").strip()
+            if not sex:
+                print("❌ Ошибка: пол не может быть пустым")
+                return
+            if sex.lower() not in ["м", "ж"]:
+                print("❌ Ошибка: пол должен быть 'м' или 'ж'")
+                return
+            
+            # Создание записи
             record = {
-                "student_id": int(input("id: ")),
-                "first_name": input("Имя: ").strip(),
-                "second_name": input("Фамилия: ").strip(),
-                "age": int(input("Возраст: ")),
-                "sex": input("Пол (м/ж): ").strip(),
+                "student_id": student_id,
+                "first_name": first_name,
+                "second_name": second_name,
+                "age": age,
+                "sex": sex.lower(),
             }
             self.db.insert_record(self.current_table, record)
-            print("✅ Добавлено!")
-        except ValueError:
-            print("❌ Ошибка ввода")
+            print(f"✅ Добавлено: {record}")
+            
+        except InvalidAgeError as e:
+            print(f"❌ Ошибка возраста: {e}")
+        except DuplicateIDError as e:
+            print(f"❌ Ошибка: {e}")
+        except (MissingColumnError, UnknownColumnError) as e:
+            print(f"❌ Ошибка структуры: {e}")
+        except Exception as e:
+            print(f"❌ Непредвиденная ошибка: {e}")
 
     def _show_all(self):
-        records = self.db.select_records(self.current_table)
-        if not records:
-            print("Нет записей")
-        else:
-            for r in records:
-                print(f"id:{r['student_id']}, {r['first_name']} {r['second_name']}, {r['age']} лет, {r['sex']}")
+        """Показать все записи."""
+        print("\n=== Все студенты ===")
+        try:
+            records = self.db.select_records(self.current_table)
+            if not records:
+                print("Нет записей")
+            else:
+                print(f"Всего записей: {len(records)}")
+                for r in records:
+                    print(f"id:{r['student_id']}, {r['first_name']} {r['second_name']}, {r['age']} лет, {r['sex']}")
+        except TableNotFoundError as e:
+            print(f"❌ {e}")
+        except Exception as e:
+            print(f"❌ Ошибка: {e}")
 
     def _find_records(self):
+        """Поиск записей с фильтрацией и проверкой ввода."""
+        print("\n=== Поиск (Enter = пропустить) ===")
+        
         filters = {}
+        
+        # Ввод ID с проверкой
         id_input = input("id (Enter пропустить): ").strip()
         if id_input:
-            filters["student_id"] = int(id_input)
-        name = input("Имя: ").strip()
-        if name:
-            filters["first_name"] = name
-        records = self.db.select_records(self.current_table, **filters)
-        if not records:
-            print("Ничего не найдено")
-        else:
-            for r in records:
-                print(f"id:{r['student_id']}, {r['first_name']} {r['second_name']}, {r['age']} лет, {r['sex']}")
+            try:
+                filters["student_id"] = int(id_input)
+            except ValueError:
+                print("❌ Ошибка: id должен быть целым числом")
+                return
+        
+        # Ввод имени
+        first_name = input("Имя: ").strip()
+        if first_name:
+            filters["first_name"] = first_name
+        
+        # Ввод фамилии
+        second_name = input("Фамилия: ").strip()
+        if second_name:
+            filters["second_name"] = second_name
+        
+        # Ввод возраста с проверкой
+        age_input = input("Возраст (Enter пропустить): ").strip()
+        if age_input:
+            try:
+                filters["age"] = int(age_input)
+            except ValueError:
+                print("❌ Ошибка: возраст должен быть целым числом")
+                return
+        
+        # Ввод пола
+        sex = input("Пол (м/ж): ").strip()
+        if sex:
+            if sex.lower() not in ["м", "ж"]:
+                print("❌ Ошибка: пол должен быть 'м' или 'ж'")
+                return
+            filters["sex"] = sex.lower()
+        
+        # Поиск
+        try:
+            records = self.db.select_records(self.current_table, **filters)
+            if not records:
+                print("Ничего не найдено")
+            else:
+                print(f"\nНайдено {len(records)} записей:")
+                for r in records:
+                    print(f"id:{r['student_id']}, {r['first_name']} {r['second_name']}, {r['age']} лет, {r['sex']}")
+        except TableNotFoundError as e:
+            print(f"❌ {e}")
+        except Exception as e:
+            print(f"❌ Ошибка поиска: {e}")
